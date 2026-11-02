@@ -5,8 +5,8 @@
     mₜ = βmₜ₋₁ + α(|zₜ₋₁| − E|zₜ|) − γzₜ₋₁
     zₜ ∼ √((ν−2)/ν) Tν, iid
 
-Большие относительные ошибки по моментам: mean, median и P(x<0.25), P(x>0.75). Серый диапазон -
-неопределенность q10-q90 через параметрический бустрап модели.
+Отношения модель/данные для среднего и квантилей q25, q50, q75.
+Серый диапазон — q10–q90 отношений по симуляциям модели.
 
 ![Model diagnostics, simulated/observed ratios with 10–90% bands](results/moments.png)
 
@@ -21,9 +21,13 @@
 All code in play.py, settings at the top. Python 3.10–3.13.
 Daily MLE only, first 91 calendar days used for filter warmup.
 
-Overlapping 21-day log-return sums. Plot simulated/observed ratios for the mean and tail
-probabilities at fixed observed quantiles, P(R≤q25), P(R≥q50), P(R≥q75).
-Observed probabilities are measured from data, approximately 0.25, 0.5, 0.25.
+Overlapping 21-day log-return sums. Plain mean and quantile ratios, without centering.
+
+    mean_ratio = mean_sim / mean_obs
+    quantile_ratio[p] = Q_sim(p) / Q_obs(p), p = 0.25, 0.5, 0.75
+
+Ratios are unstable near a zero observed mean or quantile.
+Negative ratios fall outside the logarithmic plot.
 10–90% bands across 100 simulated histories of observed length, fitted parameters fixed.
 Point estimates from a separate 100,000-day simulation.
 Simulation clips standardized shocks at p and 1−p quantiles, p=1/(20×262) per tail,

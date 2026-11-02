@@ -14,7 +14,7 @@ from scipy.stats import t
 
 N_TRIALS, N_SIM, SEED = 100, 100_000, 0
 NAMES = ("mu", "omega", "beta", "alpha", "gamma", "nu")
-STATS = ("mean", "P(R≤q25)", "P(R≥q50)", "P(R≥q75)")
+STATS = ("mean", "q25", "q50", "q75")
 BOUNDS = ((-2, 2), (-10, 10), (.0001, .999), (0, 2), (0, 2), (2.05, 100))
 
 
@@ -53,12 +53,10 @@ def simulate(q, z, burn, cap):
     return r
 
 
-def moments(r, levels=None):
+def moments(r):
     s = np.r_[0., np.cumsum(r)]
     x = s[21:] - s[:-21]
-    tails = np.quantile(x, [.25, .5, .75]) if levels is None else [
-        np.mean(x <= levels[0]), np.mean(x >= levels[1]), np.mean(x >= levels[2])]
-    result = np.r_[x.mean(), tails]
+    result = np.r_[x.mean(), np.quantile(x, [.25, .5, .75])]
     assert np.all(np.isfinite(result))
     return result
 
@@ -83,13 +81,12 @@ def main():
     q = min(fits, key=lambda f: f.fun).x
     cap = t.ppf(1 - 1 / (20 * 262), q[5]) * np.sqrt((q[5] - 2) / q[5])
     burn = max(1000, math.ceil(math.log(1e-10) / math.log(q[2])))
-    levels = moments(r)[1:]  # Fixed observed thresholds, lower tail at q25, upper at q50/q75.
 
     def sample(n, rng):
         z = rng.standard_t(q[5], n + burn) * np.sqrt((q[5] - 2) / q[5])
-        return moments(center + scale * simulate(q, z, burn, cap), levels)
+        return moments(center + scale * simulate(q, z, burn, cap))
 
-    rng, real = np.random.default_rng(SEED + 1), moments(r, levels)
+    rng, real = np.random.default_rng(SEED + 1), moments(r)
     trials = np.array([sample(len(r), rng) for _ in range(N_TRIALS)])
     point = sample(N_SIM, np.random.default_rng(SEED))
     widths = np.diff(np.quantile(trials, [.1, .9], axis=0), axis=0)[0]
@@ -106,15 +103,15 @@ def main():
     out.mkdir(exist_ok=True)
     with (out / "moments.csv").open("w") as f:
         w = csv.writer(f)
-        w.writerow(["statistic", "threshold", "observed", "simulated", "ratio", "q10", "q90"])
-        w.writerows(zip(STATS, ["", *levels], real, point, ratios, lo, hi))
+        w.writerow(["statistic", "observed", "simulated", "ratio", "q10", "q90"])
+        w.writerows(zip(STATS, real, point, ratios, lo, hi))
     fig, ax = plt.subplots(figsize=(8, 4.5), layout="constrained")
     ax.vlines(range(4), lo, hi, color=".75", linewidth=12, label="10–90% across simulated histories")
     ax.scatter(range(4), ratios, color="black", zorder=3, label="Long simulation / observed")
     ax.axhline(1, color="steelblue", linewidth=1)
     ax.set(xticks=range(4), xticklabels=STATS, yscale="log", ylim=(.5, 2),
            ylabel="Simulated / observed",
-           title="SPY · 21-day log returns\nTail probabilities at observed quantiles, plus mean ratio")
+           title="SPY · 21-day log returns\nMean and quantile ratios")
     ax.set_yticks([.5, .75, 1, 1.5, 2], labels=["0.5", "0.75", "1", "1.5", "2"])
     ax.minorticks_off()
     ax.legend(fontsize=8)
