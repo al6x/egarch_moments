@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numba import njit
 from scipy.optimize import minimize
+from scipy.stats import t
 
 N_TRIALS, N_SIM, SEED = 100, 100_000, 0
 NAMES = ("mu", "omega", "beta", "alpha", "gamma", "nu")
@@ -39,15 +40,16 @@ def loglik(q, r, warmup):
 
 
 @njit(cache=True)
-def simulate(q, z, burn):
+def simulate(q, z, burn, cap):
     mu, omega, beta, alpha, gamma, nu = q
     ea, _ = t_constants(nu)
     r, m = np.empty(len(z) - burn), 0.
     for i in range(len(z)):
         v = omega + m
         if not math.isfinite(v) or abs(v) > 700: raise FloatingPointError("nonfinite simulation scale")
-        if i >= burn: r[i - burn] = mu + math.exp(v / 2) * z[i]
-        m = beta * m + alpha * (abs(z[i]) - ea) - gamma * z[i]
+        shock = min(max(z[i], -cap), cap)
+        if i >= burn: r[i - burn] = mu + math.exp(v / 2) * shock
+        m = beta * m + alpha * (abs(shock) - ea) - gamma * shock
     return r
 
 
@@ -79,12 +81,13 @@ def main():
         if not fit.success: raise RuntimeError(f"MLE not converged: {fit.message}")
         fits.append(fit)
     q = min(fits, key=lambda f: f.fun).x
+    cap = t.ppf(1 - 1 / (20 * 262), q[5]) * np.sqrt((q[5] - 2) / q[5])
     burn = max(1000, math.ceil(math.log(1e-10) / math.log(q[2])))
     levels = moments(r)[1:]  # Fixed observed thresholds, lower tail at q25, upper at q50/q75.
 
     def sample(n, rng):
         z = rng.standard_t(q[5], n + burn) * np.sqrt((q[5] - 2) / q[5])
-        return moments(center + scale * simulate(q, z, burn), levels)
+        return moments(center + scale * simulate(q, z, burn, cap), levels)
 
     rng, real = np.random.default_rng(SEED + 1), moments(r, levels)
     trials = np.array([sample(len(r), rng) for _ in range(N_TRIALS)])
@@ -98,7 +101,7 @@ def main():
     raw[0], raw[1] = center + scale * q[0], q[1] + 2 * np.log(scale)
     print("Parameters (raw returns):", dict(zip(NAMES, raw.tolist())))
     for name, ratio, low, high in zip(STATS, ratios, lo, hi): print(f"{name:>4}: {ratio:.4f} [{low:.4f}, {high:.4f}]")
-    print("Sample mean only: t-EGARCH has no finite unconditional absolute mean for nonzero volatility shocks.")
+    print(f"Simulation shock cap: ±{cap:.4f}, p=1/(20×262) per tail, MLE uncapped")
     out = root / "results"
     out.mkdir(exist_ok=True)
     with (out / "moments.csv").open("w") as f:
@@ -126,6 +129,7 @@ def main():
         r"0<\beta<1,\quad \alpha,\gamma\geq0,\quad \nu>2.$"]
     fig = plt.figure(figsize=(12, 3.4), facecolor="white")
     for y, text in zip([.83, .62, .40, .12], formulas): fig.text(.04, y, text, fontsize=21)
+    fig.text(.04, .01, "Simulation: shocks clipped at p and 1−p, p=1/(20×262). MLE uncapped.", fontsize=12)
     fig.savefig(out / "model.png", dpi=180, bbox_inches="tight", pad_inches=.2)
     plt.close(fig)
 

@@ -25,12 +25,15 @@ Overlapping 21-day log-return sums. Plot simulated/observed ratios for the mean 
 probabilities at fixed observed quantiles, P(R≤q25), P(R≥q50), P(R≥q75).
 Observed probabilities are measured from data, approximately 0.25, 0.5, 0.25.
 10–90% bands across 100 simulated histories of observed length, fitted parameters fixed.
-Point estimates from a separate 100,000-day simulation, no shock clipping.
+Point estimates from a separate 100,000-day simulation.
+Simulation clips standardized shocks at p and 1−p quantiles, p=1/(20×262) per tail,
+including burn-in and state updates. MLE and E|zₜ| centering use the uncapped Student-t.
+Clipped shocks are not rescaled to unit variance.
 
     moment_error = mean(((simulated-observed)/(trial_q90-trial_q10))**2)
 
-Student-t EGARCH has no finite unconditional absolute-return mean for nonzero α or γ.
-The displayed mean is a finite-sample diagnostic. Tail probabilities remain well defined.
+Uncapped Student-t EGARCH has no finite unconditional absolute-return mean for nonzero α or γ.
+The simulation cap makes simulated moments finite, diagnostics refer to this capped process.
 
 spy.csv is the stored SPY USD close series from bc-prices, SPY:ARCX/price/close,
 2004-12-31 to 2026-09-30, as used by garch/play.jl. No additional dividend adjustment.
