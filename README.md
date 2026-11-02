@@ -1,11 +1,15 @@
-# Student-t EGARCH
+Модель E-GARCH-T фиттинг MLE, данные 20 лет истории SP500
 
     rₜ = μ + √hₜ zₜ
     log hₜ = ω + mₜ
     mₜ = βmₜ₋₁ + α(|zₜ₋₁| − E|zₜ|) − γzₜ₋₁
     zₜ ∼ √((ν−2)/ν) Tν, iid
 
+Большие ошибки на mean, median и граничных квантилях 0.25 с обоих сторон.
+
 ![Model diagnostics, simulated/observed ratios with 10–90% bands](results/moments.png)
+
+Можно запустить самостоятельно, данные приложены.
 
 # Run it
 
