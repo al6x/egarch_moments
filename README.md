@@ -1,4 +1,4 @@
-### Student-t EGARCH
+# Student-t EGARCH
 
     rₜ = μ + √hₜ zₜ
     log hₜ = ω + mₜ
